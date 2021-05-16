@@ -8,39 +8,119 @@
 import UIKit
 import CoreData
 
+var ReminderList = [Notes]()
 
-class ToDoVC: UIViewController, UITableViewDelegate, UITableViewDataSource {
+class ToDoVC: UIViewController, UITableViewDelegate, UITableViewDataSource, sendDatatoCoreData, UISearchControllerDelegate, UISearchResultsUpdating {
     
     var firstLoad = true
+    var tagNotesChanged = ""
+    var filteredData: [Notes] = ReminderList
+    
+    let appDelegate = UIApplication.shared.delegate as! AppDelegate
+    lazy var context: NSManagedObjectContext = appDelegate.persistentContainer.viewContext
+    let request = NSFetchRequest<NSFetchRequestResult>(entityName: "Notes")
     
     @IBOutlet weak var tableViewReminder: UITableView!
     
     let search = UISearchController()
     
+    func sendImageDidTap(myData: String) {
+        tagNotesChanged = myData
+        tableViewReminder.reloadData()
+    }
+    
     func updateSearchResults(for searchController: UISearchController) {
         guard let text = searchController.searchBar.text else{
             return
         }
-        print(text)
+        filteredData = []
+        if text == "" {
+            filteredData = ReminderList
+        }
+        else{
+            for note in ReminderList {
+                if note.title.lowercased().contains(text.lowercased()){
+                    filteredData.append(note)
+                }
+            }
+        }
+        self.tableViewReminder.reloadData()
         
     }
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return noteList.count
+        print("Populate Row Reminder: \(ReminderList.count)")
+        return filteredData.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let reminderCell = tableView.dequeueReusableCell(withIdentifier: "ToDoTableViewCell") as! ToDoDetailTableViewCell
         let thisNote: Notes!
-        thisNote = noteList[indexPath.row]
+        thisNote = filteredData[indexPath.row]
+        if thisNote.tagNotes == "Check"{
+            reminderCell.backgroundColor = .systemGray6
+            reminderCell.titleLabel.text = thisNote.title
+            let format = DateFormatter()
+            format.dateFormat = "dd MMM yyyy"
+            let dateShow = format.string(from: thisNote.date)
+            reminderCell.dateLabel.text = dateShow
+    //        thisNote.tagNotes = tagNotesChanged
+    //        print("remineder tag: \(thisNote.tagNotes)")
+            reminderCell.buttonImage.setImage(UIImage(named: thisNote.tagNotes), for: UIControl.State.normal)
+        }
+        else {
+            reminderCell.titleLabel.text = thisNote.title
+            let format = DateFormatter()
+            format.dateFormat = "dd MMM yyyy"
+            let dateShow = format.string(from: thisNote.date)
+            reminderCell.dateLabel.text = dateShow
+    //        thisNote.tagNotes = tagNotesChanged
+    //        print("remineder tag: \(thisNote.tagNotes)")
+            reminderCell.buttonImage.setImage(UIImage(named: thisNote.tagNotes), for: UIControl.State.normal)
+        }
         
-        reminderCell.titleLabel.text = thisNote.title
-//        reminderCell.dateLabel.text = thisNote.date
-//        reminderCell.checkmark.image = UIImage(named: <#T##String#>)
         return reminderCell
+    }
+    
+    func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        let actionDelete = UIContextualAction(style: .destructive, title: "Delete"){
+            (action, view, completionHandler) in
+            
+            let decisionToRemove = self.filteredData[indexPath.row]
+            
+            self.context.delete(decisionToRemove)
+            
+            try! self.context.save()
+            
+            self.reloadTable()
+            
+            self.viewDidAppear(true)
+            
+        }
+        return UISwipeActionsConfiguration(actions: [actionDelete])
+    }
+    
+    func tableView(_ tableView: UITableView, leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        let actionDone = UIContextualAction(style: .normal, title: "Done"){
+            (action, view, completionHandler) in
+            
+            let decisionToDone = self.filteredData[indexPath.row]
+            
+            decisionToDone.tagNotes = "Check"
+            
+            try! self.context.save()
+            
+            self.reloadTable()
+            
+            self.viewDidAppear(true)
+        }
+        actionDone.backgroundColor = .systemGreen
+        return UISwipeActionsConfiguration(actions: [actionDone])
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        search.searchResultsUpdater = self
+        search.delegate = self
         navigationItem.searchController = search
         tableViewReminder.delegate = self
         tableViewReminder.dataSource = self
@@ -48,32 +128,32 @@ class ToDoVC: UIViewController, UITableViewDelegate, UITableViewDataSource {
             firstLoad = false
             reloadTable()
         }
+        filteredData = ReminderList
         
         // Do any additional setup after loading the view.
     }
     func reloadTable(){
-        let appDelegate = UIApplication.shared.delegate as! AppDelegate
-        let context: NSManagedObjectContext = appDelegate.persistentContainer.viewContext
-        let request = NSFetchRequest<NSFetchRequestResult>(entityName: "Notes")
+        
         do{
             let results:NSArray = try context.fetch(request) as NSArray
             print(results.count)
             for result in results {
                 let note = result as! Notes
                 if note.reminder == true {
-                    noteList.append(note)
+                    ReminderList.append(note)
                 }
                 else{
-                    print("ini Notes")
+                    
                 }
             }
+            filteredData = ReminderList
         }
         catch{
             print("Fetch Failed")
         }
     }
     override func viewDidAppear(_ animated: Bool) {
-        noteList.removeAll()
+        ReminderList.removeAll()
         DispatchQueue.main.async {
             self.reloadTable()
             self.tableViewReminder.reloadData()
@@ -95,15 +175,26 @@ class ToDoVC: UIViewController, UITableViewDelegate, UITableViewDataSource {
             let noteDetail = segue.destination as? NotesDetailVC
             
             let selectedNote: Notes!
-            selectedNote = noteList[indexPath.row]
+            selectedNote = ReminderList[indexPath.row]
             noteDetail?.selectedNote = selectedNote
             tableViewReminder.deselectRow(at: indexPath, animated: true)
             
             
         }
     }
-    @IBAction func searchBar(){
-        
+    func searchBar(_ searchBar: UISearchBar, textDidChange text: String){
+        filteredData = []
+        if text == "" {
+            filteredData = noteList
+        }
+        else{
+            for note in noteList {
+                if note.title.lowercased().contains(text.lowercased()){
+                    filteredData.append(note)
+                }
+            }
+        }
+        self.tableViewReminder.reloadData()
     }
     
 

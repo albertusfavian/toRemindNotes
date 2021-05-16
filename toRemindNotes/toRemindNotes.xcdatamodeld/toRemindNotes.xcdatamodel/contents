@@ -4,11 +4,12 @@
         <attribute name="content" optional="YES" attributeType="String"/>
         <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="isCheck" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="reminder" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="tagNotes" optional="YES" attributeType="String"/>
         <attribute name="title" optional="YES" attributeType="String"/>
     </entity>
     <elements>
-        <element name="Notes" positionX="-63" positionY="-18" width="128" height="119"/>
+        <element name="Notes" positionX="-63" positionY="-18" width="128" height="134"/>
     </elements>
 </model>

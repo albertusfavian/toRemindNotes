@@ -11,19 +11,39 @@ import CoreData
 
 var noteList = [Notes]()
 
-class NotesVC: UIViewController, UISearchResultsUpdating {
+
+class NotesVC: UIViewController, UISearchResultsUpdating, UISearchBarDelegate, UISearchControllerDelegate {
 
     var firstLoad = true
     
+    var filteredData: [Notes] = noteList
+    
+    let appDelegate = UIApplication.shared.delegate as! AppDelegate
+    lazy var context: NSManagedObjectContext = appDelegate.persistentContainer.viewContext
+    let request = NSFetchRequest<NSFetchRequestResult>(entityName: "Notes")
+    
+//    var filteredNoteList: Notes = []()
+    
     @IBOutlet weak var tableViewNotes: UITableView!
     
-    let search = UISearchController()
+    let search = UISearchController(searchResultsController: nil)
     
     func updateSearchResults(for searchController: UISearchController) {
         guard let text = searchController.searchBar.text else{
             return
         }
-        print(text)
+        filteredData = []
+        if text == "" {
+            filteredData = noteList
+        }
+        else{
+            for note in noteList {
+                if note.title.lowercased().contains(text.lowercased()){
+                    filteredData.append(note)
+                }
+            }
+        }
+        self.tableViewNotes.reloadData()
         
     }
 }
@@ -34,42 +54,48 @@ extension NotesVC: UITableViewDelegate, UITableViewDataSource{
         let notesCell = tableView.dequeueReusableCell(withIdentifier: "NotesTableViewCell") as! NotesTVC
         
         let thisNote: Notes!
-        thisNote = noteList[indexPath.row]
+        thisNote = filteredData[indexPath.row]
         
         notesCell.titleNameLabel.text = thisNote.title
         notesCell.contentLabel.text = thisNote.content
-        notesCell.tagLabel.image = UIImage(named: "red.png")
+        notesCell.tagLabel?.image = UIImage(named: thisNote.tagNotes)
         
         return notesCell
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         print("Populate Row = \(noteList.count)")
-        return noteList.count
         
+        return filteredData.count
     }
     
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        search.searchResultsUpdater = self
-        navigationItem.searchController = search
-        // Do any additional setup after loading the view.
-        tableViewNotes.delegate = self
-        tableViewNotes.dataSource = self
-        if (firstLoad){
-            firstLoad = false
-            reloadTable()
-        }
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        self.performSegue(withIdentifier: "editNote", sender: self)
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return 89
     }
 
+    
+    func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        let actionDelete = UIContextualAction(style: .destructive, title: "Delete"){
+            (action, view, completionHandler) in
+            
+            let decisionToRemove = self.filteredData[indexPath.row]
+            
+            self.context.delete(decisionToRemove)
+            
+            try! self.context.save()
+            
+            self.reloadTable()
+            
+            self.viewDidAppear(true)
+            
+        }
+        return UISwipeActionsConfiguration(actions: [actionDelete])
+    }
     func reloadTable(){
-        let appDelegate = UIApplication.shared.delegate as! AppDelegate
-        let context: NSManagedObjectContext = appDelegate.persistentContainer.viewContext
-        let request = NSFetchRequest<NSFetchRequestResult>(entityName: "Notes")
         do{
             let results:NSArray = try context.fetch(request) as NSArray
             print(results.count)
@@ -79,26 +105,43 @@ extension NotesVC: UITableViewDelegate, UITableViewDataSource{
                     noteList.append(note)
                 }
                 else{
-                    print("ini todo")
+                    
                 }
             }
+            filteredData = noteList
         }
         catch{
             print("Fetch Failed")
         }
     }
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        search.searchResultsUpdater = self
+        search.delegate = self
+        navigationItem.searchController = search
+        // Do any additional setup after loading the view.
+        tableViewNotes.delegate = self
+        tableViewNotes.dataSource = self
+        if (firstLoad){
+            firstLoad = false
+            reloadTable()
+        }
+        filteredData = noteList
+    }
+    
     override func viewDidAppear(_ animated: Bool) {
         noteList.removeAll()
+        filteredData.removeAll()
         DispatchQueue.main.async {
             self.reloadTable()
+            print ("reload data")
             self.tableViewNotes.reloadData()
+            
         }
     }
     
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        self.performSegue(withIdentifier: "editNote", sender: self)
-        
-    }
+    
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if(segue.identifier == "editNote"){
@@ -109,35 +152,23 @@ extension NotesVC: UITableViewDelegate, UITableViewDataSource{
             let selectedNote: Notes!
             selectedNote = noteList[indexPath.row]
             noteDetail?.selectedNote = selectedNote
-            
-            
             tableViewNotes.deselectRow(at: indexPath, animated: true)
-            
-            
+        }
+        
+//        SEARCH
+        func searchBar(_ searchBar: UISearchBar, textDidChange text: String){
+            filteredData = []
+            if text == "" {
+                filteredData = noteList
+            }
+            else{
+                for note in noteList {
+                    if note.title.lowercased().contains(text.lowercased()){
+                        filteredData.append(note)
+                    }
+                }
+            }
+            self.tableViewNotes.reloadData()
         }
     }
 }
-
-
-
-
-
-
-
-//
-//    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-//        let notesCell = tableView.dequeueReusableCell(withIdentifier: "NotesTableViewCell") as! NotesTableViewCell
-//
-//        let thisNote: Notes!
-//        thisNote = noteList[indexPath.row]
-//        notesCell.notesTitleLabel.text = thisNote.title
-//        notesCell.notesTitleLabel.text = thisNote.content
-//        notesCell.importantTagNotes.image = UIImage
-//
-//
-//        return notesCell
-//    }
-    
-//    override func viewDidAppear(_ animated: Bool) {
-//        tableViewNotes.reloadData()
-//    }

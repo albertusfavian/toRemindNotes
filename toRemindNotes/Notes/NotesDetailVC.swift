@@ -15,7 +15,10 @@ class NotesDetailVC: UIViewController, UITableViewDelegate, UITableViewDataSourc
     var selectedNote: Notes? = nil
     var switches: Bool?
     var dateResult: Date = Date()
+    var pickerResult = ""
+    
 //    var dateResultSave: Date = Date()
+    
     
     @IBOutlet weak var tableViewDetail: UITableView!
     @IBOutlet weak var titleName: UITextField!
@@ -30,6 +33,20 @@ class NotesDetailVC: UIViewController, UITableViewDelegate, UITableViewDataSourc
         dateResult = myData
         print("setelah dilempar: \(dateResult)")
 //        tableViewDetail.reloadData()
+    }
+
+    func sendPickerToFirstViewController(myData: String) {
+        
+        if myData == "Important" {
+            pickerResult = "red"
+        }
+        else if myData == "Not So Important"{
+            pickerResult = "yellow"
+        }
+        else{
+            pickerResult = "green"
+        }
+        print("picker result yang diterima: \(pickerResult)")
     }
     
     
@@ -66,6 +83,18 @@ class NotesDetailVC: UIViewController, UITableViewDelegate, UITableViewDataSourc
         else if indexPath.row == 1{
             let notesDetailCell = tableView.dequeueReusableCell(withIdentifier: "tagImportant", for: indexPath) as? NotesDetailTableViewCell
                 notesDetailCell?.tagLabel.text = "Tag"
+            print("pickerresult di cell: \(pickerResult)")
+            notesDetailCell?.delegate = self
+            if pickerResult == "red"{
+                notesDetailCell?.pickerString.selectRow(0, inComponent: 0, animated: true)
+            }
+            else if pickerResult == "yellow"{
+                notesDetailCell?.pickerString.selectRow(1, inComponent: 0, animated: true)
+            }
+            else{
+                notesDetailCell?.pickerString.selectRow(2, inComponent: 0, animated: true)
+            }
+            
             return notesDetailCell!
         }
         else{
@@ -80,7 +109,12 @@ class NotesDetailVC: UIViewController, UITableViewDelegate, UITableViewDataSourc
                 notesDetailCell?.isHidden = false
             }
             print(dateResult)
-            notesDetailCell?.datePicker.setDate(dateResult, animated: true)
+            if switches == true {
+                notesDetailCell?.datePicker.setDate(dateResult, animated: true)
+            }
+            else{
+                
+            }
             
             let picker = UIDatePicker()
             picker.datePickerMode = .date
@@ -117,14 +151,25 @@ class NotesDetailVC: UIViewController, UITableViewDelegate, UITableViewDataSourc
         view.addGestureRecognizer(tap)
         switches = selectedNote?.reminder
         dateResult = selectedNote?.date ?? Date()
-
+        pickerResult = selectedNote?.tagNotes ?? "red"
         
-        
-        
-        
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillChange(notification:)), name: UIResponder.keyboardDidShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillChange(notification:)), name: UIResponder.keyboardDidHideNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillChange(notification:)), name: UIResponder.keyboardDidChangeFrameNotification, object: nil)
     }
-
     
+    deinit {
+        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardDidChangeFrameNotification, object: nil)
+    }
+    
+
+    @objc func keyboardWillChange(notification: Notification){
+        print ("Keyword Will Show \(notification.name.rawValue)")
+        
+        view.frame.origin.y = -250
+    }
     
     @objc func pickerSelected(sender: UIDatePicker){
         let formatter = DateFormatter()
@@ -139,6 +184,7 @@ class NotesDetailVC: UIViewController, UITableViewDelegate, UITableViewDataSourc
     @objc func dismissKeyboard() {
         //Causes the view (or one of its embedded text fields) to resign the first responder status.
         view.endEditing(true)
+        view.frame.origin.y = 0
     }
     func textViewDidChange(_ textView: UITextView) {
         let mutableAttrStr = NSMutableAttributedString(string: textView.text)
@@ -164,6 +210,25 @@ class NotesDetailVC: UIViewController, UITableViewDelegate, UITableViewDataSourc
             newNote.id = noteList.count as NSNumber
             newNote.title = titleName.text
             newNote.content = contentNotes.text
+            newNote.reminder = switches ?? true
+            newNote.date = dateResult
+            if switches == true{
+                if pickerResult == "red"{
+                    pickerResult = "red-uncheck"
+                }
+                else if pickerResult == "Not So Important"{
+                    pickerResult = "yellow-uncheck"
+                }
+                else{
+                    pickerResult = "green-uncheck"
+                }
+                newNote.tagNotes = pickerResult
+            }
+            else{
+                newNote.tagNotes = pickerResult
+            }
+            
+            
             do{
                 try context.save()
                 noteList.append(newNote)
@@ -184,6 +249,22 @@ class NotesDetailVC: UIViewController, UITableViewDelegate, UITableViewDataSourc
                         note.content = contentNotes.text
                         note.reminder = switches ?? true
                         note.date = dateResult
+                        note.tagNotes = pickerResult
+                        if switches == true{
+                            if pickerResult == "red"{
+                                pickerResult = "red-uncheck"
+                            }
+                            else if pickerResult == "Not So Important"{
+                                pickerResult = "yellow-uncheck"
+                            }
+                            else{
+                                pickerResult = "green-uncheck"
+                            }
+                            note.tagNotes = pickerResult
+                        }
+                        else{
+                            note.tagNotes = pickerResult
+                        }
                         try context.save()
                         navigationController?.popViewController(animated: true)
                     }
